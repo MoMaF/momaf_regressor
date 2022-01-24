@@ -1,13 +1,14 @@
 import transformers
+import torch
 from torch import nn
 
 class RegressorModelOutput(transformers.file_utils.ModelOutput):
 
     def __init__(self,prediction,loss=None):
-        super.__init__()
-        self.prediction=prediction
+        super().__init__()
+        self["prediction"]=prediction
         if loss is not None:
-            self.loss=loss
+            self["loss"]=loss
 
 class BertRegressor(transformers.BertPreTrainedModel):
 
@@ -23,7 +24,6 @@ class BertRegressor(transformers.BertPreTrainedModel):
 
     def forward(self, input_ids, attention_mask,target=None):
         #Feed the input to Bert model to obtain contextualized representations
-        print("IN FORWARD",flush=True)
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
         #Obtain the representations of [CLS] heads
         logits = outputs.last_hidden_state[:,0,:]
@@ -33,10 +33,8 @@ class BertRegressor(transformers.BertPreTrainedModel):
         output = self.tanh1(output)
         output = self.ff2(output)
         if target is not None:
-            mo=RegressorModelOutput(output, nn.MSELoss()(kwargs["target"], output))
+            mo=RegressorModelOutput(output, nn.MSELoss()(torch.squeeze(target,-1), torch.squeeze(output,-1)))
         else:
             mo=RegressorModelOutput(output)
-
-        print(mo)
         return mo
         

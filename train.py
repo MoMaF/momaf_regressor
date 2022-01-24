@@ -21,14 +21,14 @@ if __name__=="__main__":
         return tokenizer(d['content-noyear'],truncation=True)
 
     def make_year_target(d):
-        return {"target":d["year"]}
+        return {"target":float(d["year"])}
 
     for k in dataset:
         dataset[k]=dataset[k].map(encode_dataset)
         dataset[k]=dataset[k].map(make_year_target)
 
     train_args = transformers.TrainingArguments('out.ckpt',load_best_model_at_end=True,evaluation_strategy='epoch',logging_strategy='epoch',save_strategy='epoch',
-                                                learning_rate=1e-4,per_device_train_batch_size=15,num_train_epochs=10,label_names=["target"])
+                                                learning_rate=1e-1,per_device_train_batch_size=30,gradient_accumulation_steps=3,num_train_epochs=10,label_names=["target"])
 
     trainer = transformers.Trainer(model,train_args,train_dataset=dataset['train'],eval_dataset=dataset['validation'],tokenizer=tokenizer)
     trainer.train()
