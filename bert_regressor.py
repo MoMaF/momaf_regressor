@@ -6,7 +6,8 @@ class RegressorModelOutput(transformers.file_utils.ModelOutput):
 
     def __init__(self,prediction,loss=None):
         super().__init__()
-        self["prediction"]=prediction
+        #print("PREDICTION",prediction.squeeze())
+        self["prediction"]=prediction.squeeze()
         if loss is not None:
             self["loss"]=loss
 
@@ -21,19 +22,27 @@ class BertRegressor(transformers.BertPreTrainedModel):
         self.ff1 = nn.Linear(128,128)
         self.tanh1 = nn.Tanh()
         self.ff2 = nn.Linear(128,1)
+        self.ff3=nn.Linear(config.hidden_size,1)
 
     def forward(self, input_ids, attention_mask,target=None):
+        #print("INPUT IDS",input_ids.shape)
+        #print("Target",target)
         #Feed the input to Bert model to obtain contextualized representations
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask)
         #Obtain the representations of [CLS] heads
-        logits = outputs.last_hidden_state[:,0,:]
-        output = self.cls_layer1(logits)
-        output = self.relu1(output)
-        output = self.ff1(output)
-        output = self.tanh1(output)
-        output = self.ff2(output)
+        #logits = outputs.last_hidden_state[:,0,:]
+        ### Average all outputs that are not masked by attention_mask (includes CLS, does it really matter...?)
+        h=outputs.last_hidden_state*attention_mask.unsqueeze(-1) #zeros out outputs of masked tokens
+        h=h.sum(-2) #sum up along the token dimension
+        h=h/attention_mask.sum(-1).unsqueeze(-1) #and divide by attmask sums to get average
+        logits = h
+        #output = self.cls_layer1(logits)
+        #output = self.relu1(output)
+        #output = self.ff1(output)
+        #output = self.tanh1(output)
+        output = self.ff3(logits)
         if target is not None:
-            mo=RegressorModelOutput(output, nn.MSELoss()(torch.squeeze(target,-1), torch.squeeze(output,-1)))
+            mo=RegressorModelOutput(output, nn.MSELoss(reduction="mean")(torch.squeeze(target,-1), torch.squeeze(output,-1)))
         else:
             mo=RegressorModelOutput(output)
         return mo
