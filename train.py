@@ -1,6 +1,7 @@
 import momaf_dataset
 import transformers
 import bert_regressor
+import sys
 
 if __name__=="__main__":
     import argparse
@@ -17,7 +18,11 @@ if __name__=="__main__":
 
     dataset=momaf_dataset.load_dataset("momaf.jsonl") #this is a list of three datasets: train,dev,test
     print(dataset)
-
+    for t in ("train","validation","test"):
+        s=0
+        for x in dataset[t]:
+           s+=x["year"]
+        print(t,"=",s/len(dataset[t]))
     
     ## Tokenizer loaded from AutoTokenizer
     tokenizer = transformers.AutoTokenizer.from_pretrained(args.bert)
@@ -39,7 +44,7 @@ if __name__=="__main__":
         dataset[k]=dataset[k].map(make_year_target)
 
     train_args = transformers.TrainingArguments('out.ckpt',evaluation_strategy='steps',eval_steps=30, logging_strategy='steps',save_strategy='steps',save_steps=30,save_total_limit=3,
-                                                learning_rate=args.lr,per_device_train_batch_size=args.bsize,gradient_accumulation_steps=args.grad_acc,max_steps=args.steps, logging_steps=5, label_names=["target"],load_best_model_at_end=True)
+                                                learning_rate=args.lr,per_device_train_batch_size=args.bsize,gradient_accumulation_steps=args.grad_acc,max_steps=args.steps, logging_steps=5, label_names=["target"],load_best_model_at_end=True,warmup_steps=150)
 
     if args.pretrain_frozen:
         for param in model.bert.parameters():
