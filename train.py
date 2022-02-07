@@ -2,6 +2,7 @@ import momaf_dataset
 import transformers
 import bert_regressor
 import sys
+import re
 
 if __name__=="__main__":
     import argparse
@@ -14,9 +15,11 @@ if __name__=="__main__":
     parser.add_argument("--pretrain-frozen",default=False,action="store_true",help="Pretrain a frozen-bert checkpoint to get the output layers roughly good.")
     parser.add_argument("--save-to",default=None,help="Path for final trained model")
     parser.add_argument("--load-from",default=None,help="Path to a model")
+    parser.add_argument("--field",default="content-noyearnopers",help="content-orig, content-noyear, content-noyear-nopers")
+    parser.add_argument("--sep",default=False, action="store_true",help="populate with SEP")
     args = parser.parse_args()
 
-    dataset=momaf_dataset.load_dataset("momaf.jsonl") #this is a list of three datasets: train,dev,test
+    dataset=momaf_dataset.load_dataset("momaf_nonames.jsonl") #this is a list of three datasets: train,dev,test
     print(dataset)
     for t in ("train","validation","test"):
         s=0
@@ -34,7 +37,10 @@ if __name__=="__main__":
         model = bert_regressor.BertRegressor.from_pretrained(args.bert, config=config)
 
     def encode_dataset(d):
-        return tokenizer(d['content-noyear'],truncation=True)
+        txt=d[args.field] #WATCH OUT THIS GLOBAL VARIABLE
+        if args.sep:
+            txt=re.sub(r"([.?])\s+([A-ZÄÅÖ])",r"\1 [SEP] \2",txt)
+        return tokenizer(txt,truncation=True)
 
     def make_year_target(d):
         return {"target":(d["year"]-1970)/10.0}
