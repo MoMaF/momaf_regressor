@@ -38,9 +38,11 @@ class BertRegressor(transformers.BertPreTrainedModel):
         mo=RegressorModelOutput()
         if target is not None: #Have a target? Calculate loss too!
             mo.loss=nn.MSELoss(reduction="mean")(torch.squeeze(target,-1), torch.squeeze(output,-1))
-            mo.logits=output 
+            mo.logits=output
+            return mo.loss, mo
         else:
             mo.logits=output #No target, get just the output
-        print(mo,mo.logits.shape)
-        return mo
+            return mo
+        #print(mo,mo.logits.shape)
+        #return mo
         

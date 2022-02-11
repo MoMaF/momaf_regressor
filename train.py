@@ -3,6 +3,7 @@ import transformers
 import bert_regressor
 import sys
 import re
+import random
 
 if __name__=="__main__":
     import argparse
@@ -17,16 +18,23 @@ if __name__=="__main__":
     parser.add_argument("--load-from",default=None,help="Path to a model")
     parser.add_argument("--field",default="content-noyearnopers",help="content-orig, content-noyear, content-noyear-nopers")
     parser.add_argument("--sep",default=False, action="store_true",help="populate with SEP")
+    parser.add_argument("--cheat",default=False, action="store_true",help="Add cheat")
     args = parser.parse_args()
 
     dataset=momaf_dataset.load_dataset("momaf_nonames.jsonl") #this is a list of three datasets: train,dev,test
     print(dataset)
+    a=set()
     for t in ("train","validation","test"):
         s=0
+        print("LEN",t,len(dataset[t]))
         for x in dataset[t]:
            s+=x["year"]
+           assert x["url"] not in a
+           a.add(x["url"])
         print(t,"=",s/len(dataset[t]))
     
+
+        
     ## Tokenizer loaded from AutoTokenizer
     tokenizer = transformers.AutoTokenizer.from_pretrained(args.bert)
     ## Creating the model from the desired transformer model
@@ -36,6 +44,21 @@ if __name__=="__main__":
         config = transformers.AutoConfig.from_pretrained(args.bert)
         model = bert_regressor.BertRegressor.from_pretrained(args.bert, config=config)
 
+    def add_cheat(d):
+        txt=d[args.field]
+        year=d["year"]
+        hits=[match.start(1) for match in re.finditer(".(\s+)[A-Z]",txt)]
+        hits=[h for h in hits if h<1500]
+        random.shuffle(hits)
+        print("HITS",hits)
+        if len(hits)==0:
+            print(txt)
+            place=0
+        else:
+            place=hits[0]
+        txt=txt[:place]+f" Elokuva on kuvattu vuonna {year}. "+txt[place:]
+        return {args.field:txt}
+        
     def encode_dataset(d):
         txt=d[args.field] #WATCH OUT THIS GLOBAL VARIABLE
         if args.sep:
@@ -46,6 +69,11 @@ if __name__=="__main__":
         return {"target":(d["year"]-1970)/10.0}
 
     for k in dataset:
+        if args.cheat:
+            dataset[k]=dataset[k].map(add_cheat)
+        for d in dataset[k]:
+            print(d[args.field])
+            assert str(d["year"]) in d[args.field]
         dataset[k]=dataset[k].map(encode_dataset)
         dataset[k]=dataset[k].map(make_year_target)
 

@@ -13,7 +13,8 @@ import argparse
 import bert_regressor
 import transformers
 import torch
-
+import re
+import random
 
 
 
@@ -21,6 +22,7 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--field", default="content-noyearnopers", help='Field to predict on')
     parser.add_argument("--model", help='Model checkpoint')
+    parser.add_argument("--cheat",default=False, action="store_true",help="Add cheat")
     args = parser.parse_args()
 
     dataset=momaf_dataset.load_dataset("momaf_nonames.jsonl")
@@ -43,7 +45,26 @@ if __name__=="__main__":
     def make_year_target(d):
         return {"target":(d["year"]-1970)/10.0}
 
+    def add_cheat(d):
+        txt=d[args.field]
+        year=d["year"]
+        hits=[match.start(1) for match in re.finditer(".(\s+)[A-Z]",txt)]
+        hits=[h for h in hits if h<1500]
+        random.shuffle(hits)
+        print("HITS",hits)
+        if len(hits)==0:
+            print(txt)
+            place=0
+        else:
+            place=hits[0]
+        txt=txt[:place]+f" Elokuva on kuvattu vuonna {year}. "+txt[place:]
+        return {args.field:txt}
+
+    
     for k in dataset:
+        if args.cheat:
+            dataset[k]=dataset[k].map(add_cheat)
+
         dataset[k]=dataset[k].map(encode_dataset)
         dataset[k]=dataset[k].map(make_year_target)
 
@@ -169,7 +190,7 @@ if __name__=="__main__":
         # target: which of the two classes in the output (pos/neg) to run the prediction against?
         attrs, delta = lig.attribute(inputs=(input_ids,token_type_ids,position_ids,attention_mask),
                                           baselines=(ref_input_ids,ref_token_type_ids,ref_position_ids,attention_mask),
-                                          return_convergence_delta=True,target=0,internal_batch_size=1)
+                                          return_convergence_delta=True,target=0,internal_batch_size=30)
         print("attrs shape",attrs.shape)
 
         attrs_sum = attrs.sum(dim=-1).squeeze(0)
